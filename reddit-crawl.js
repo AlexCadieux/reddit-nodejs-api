@@ -2,40 +2,64 @@ var request = require('request-promise');
 var mysql = require('promise-mysql');
 var RedditAPI = require('./reddit');
 
+
+
+crawl();
+
+
+
+
+
+
 function getSubreddits() {
-    return request(/* fill in the URL, it's always the same */)
+    return request('https://www.reddit.com/.json?limit=40')
         .then(response => {
             // Parse response as JSON and store in variable called result
-            var response; // continue this line
+            var result = JSON.parse(response);
 
             // Use .map to return a list of subreddit names (strings) only
-            return response.data.children.map(/* write a function */)
+            return result.data.children.map(function(object) {
+                return object.data.subreddit;
+            });
         });
 }
 
+// getSubreddits().then(function(result) {
+//     console.log(result)
+// });
+
 function getPostsForSubreddit(subredditName) {
-    return request(/* fill in the URL, it will be based on subredditName */)
+    return request('https://www.reddit.com/r/' + subredditName + '.json?limit=50')
         .then(
             response => {
                 // Parse the response as JSON and store in variable called result
-                var response; // continue this line
+                var result = JSON.parse(response); // continue this line
 
 
-                return response.data.children
-                    .filter(/* write a function */) // Use .filter to remove self-posts
-                    .map(/* write a function */) // Use .map to return title/url/user objects only
+                return result.data.children
+                    .filter(function(object) {
+                        return !object.data.is_self;
+                    }) // Use .filter to remove self-posts
+                    .map(function(object) {
+                        return {
+                            title: object.data.title,
+                            url: object.data.url,
+                            user: object.data.author
+                        };
+                    }); // Use .map to return title/url/user objects only
 
             }
         );
 }
 
+
 function crawl() {
     // create a connection to the DB
     var connection = mysql.createPool({
         host     : 'localhost',
-        user     : 'ziad_saab', // CHANGE THIS :)
+        user     : 'root',
         password : '',
-        database: 'reddit',
+        database: 'reddit_api',
         connectionLimit: 10
     });
 
@@ -78,10 +102,14 @@ function crawl() {
                                 userIdPromise = myReddit.createUser({
                                     username: post.user,
                                     password: 'abc123'
+                            })
+                            .catch(function(err) {
+                                    return users[post.user];
                                 });
                             }
 
                             userIdPromise.then(userId => {
+                                users[post.user] = userId;
                                 return myReddit.createPost({
                                     subredditId: subId,
                                     userId: userId,
@@ -93,4 +121,4 @@ function crawl() {
                     });
             });
         });
-}
+} 
